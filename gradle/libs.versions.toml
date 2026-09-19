@@ -34,7 +34,6 @@ escpos-thermalprinter-android = { group = "com.github.DantSu", name = "ESCPOS-Th
 html2bitmap = { group = "com.izettle", name = "html2bitmap", version.ref = "html2bitmap" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
-protobuf-gradle-plugin = { group = "com.google.protobuf", name = "protobuf-gradle-plugin", version.ref = "protobufGradlePlugin" }
 protobuf-kotlin-lite = { group = "com.google.protobuf", name = "protobuf-kotlin-lite", version.ref = "protobufKotlinLite" }
 
 [plugins]
