@@ -4,6 +4,8 @@ import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -68,6 +70,8 @@ val Context.settingsDataStore: DataStore<Settings> by dataStore(
     fileName = "settings.pb",
     serializer = SettingsSerializer,
 )
+
+const val PRESETS_ASSET = "presets.json"
 
 class PrintActivity : ComponentActivity() {
     private val bluetoothBroadcastReceiver = BluetoothBroadcastReceiver(this)
@@ -139,6 +143,95 @@ class PrintActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * A broken shipped file must not take the settings screen down with it. PresetsTest is what is
+     * meant to catch that before a release.
+     */
+    val builtInPresets: List<Preset> by lazy {
+        try {
+            parsePresets(assets.open(PRESETS_ASSET).bufferedReader().use { it.readText() })
+        } catch (exception: Exception) {
+            exception.printStackTrace()
+            emptyList()
+        }
+    }
+
+    fun applyPresetToPrinter(
+        uuid: String,
+        preset: Preset,
+    ) {
+        updatePrinterSetting(uuid = uuid) { printer ->
+            applyPreset(preset, printer.build()).toBuilder()
+        }
+        toast("Applied ${preset.label}")
+    }
+
+    fun saveCurrentAsPreset(
+        uuid: String,
+        label: String,
+    ) {
+        appCoroutineScope.launch {
+            this@PrintActivity.settingsDataStore.updateData { currentSettings ->
+                val printer = currentSettings.printersMap[uuid] ?: return@updateData currentSettings
+                val id = USER_PRESET_PREFIX + UUID.randomUUID().toString()
+                currentSettings
+                    .toBuilder()
+                    .putUserPresets(id, presetFromPrinter(id, label.trim().ifEmpty { printer.name }, printer))
+                    .build()
+            }
+            toast("Saved preset")
+        }
+    }
+
+    fun deleteUserPreset(id: String) {
+        appCoroutineScope.launch {
+            this@PrintActivity.settingsDataStore.updateData {
+                it.toBuilder().removeUserPresets(id).build()
+            }
+        }
+    }
+
+    fun copyPresetsToClipboard(presets: Collection<Preset>) {
+        if (presets.isEmpty()) {
+            toast("Nothing to export")
+            return
+        }
+        val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java) ?: return
+        clipboard.setPrimaryClip(ClipData.newPlainText("printer presets", presetsToJson(presets)))
+        toast(if (presets.size == 1) "Copied ${presets.first().label}" else "Copied ${presets.size} presets")
+    }
+
+    fun importPresetsFromClipboard() {
+        val clipboard = ContextCompat.getSystemService(this, ClipboardManager::class.java)
+        val clip = clipboard?.primaryClip?.takeIf { it.itemCount > 0 }
+        val text = clip?.getItemAt(0)?.coerceToText(this)?.toString()
+        if (text.isNullOrBlank()) {
+            toast("Clipboard is empty")
+            return
+        }
+        val imported =
+            try {
+                parsePresets(text)
+            } catch (exception: PresetFormatException) {
+                toast(exception.message ?: "Could not read those presets")
+                return
+            }
+        appCoroutineScope.launch {
+            this@PrintActivity.settingsDataStore.updateData { currentSettings ->
+                val builder = currentSettings.toBuilder()
+                imported.forEach { builder.putUserPresets(it.id, it) }
+                builder.build()
+            }
+            toast(if (imported.size == 1) "Imported ${imported[0].label}" else "Imported ${imported.size} presets")
+        }
+    }
+
+    private fun toast(message: String) {
+        runOnUiThread {
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     fun printTestPage(uuid: String) {
         val pages = JSONArray()
         pages.put("<html><body><div style=\"font-size: 70vw; margin: 0 auto\">\uD83D\uDDA8️</div></body></html>")
@@ -147,6 +240,22 @@ class PrintActivity : ComponentActivity() {
                 printHtml(pages, uuid)
             }
         }
+    }
+
+    /**
+     * Only ever called for a printer that has just been discovered, where there is no user
+     * configuration to clobber. Everywhere else a match is a suggestion the user accepts.
+     */
+    private fun presetted(
+        builder: Settings.Builder,
+        bluetoothName: String? = null,
+        usbId: String? = null,
+        printer: PrinterSettings,
+    ): PrinterSettings {
+        val preset =
+            matchPreset(mergePresets(builtInPresets, builder.userPresetsMap.values), bluetoothName, usbId)
+                ?: return printer
+        return applyPreset(preset, printer)
     }
 
     private fun updatePrintersList() {
@@ -179,32 +288,27 @@ class PrintActivity : ComponentActivity() {
                     .filter { it.bluetoothClass.deviceClass == 0x600 || it.bluetoothClass.deviceClass == 0x680 }
                     .forEach {
                         if (!builder.printersMap.contains(it.address)) {
-                            val newPrinter =
+                            val discovered =
                                 DEFAULT_PRINTER_SETTINGS
                                     .toBuilder()
                                     .setInterface(Interface.BLUETOOTH)
                                     .setAddress(it.address)
                                     .setName(it.name)
-                                    .setDriver(if (it.name.startsWith("CMP_")) Driver.CPCL else Driver.ESC_POS)
-                                    .setDithering(if (it.name.startsWith("CMP_")) Dithering.NONE else Dithering.GRADIENT)
-                                    .setKeepAlive(it.name.startsWith("CMP_")) // Keep connections alive by default for Citizen printers
                                     .build()
-                            builder.putPrinters(it.address, newPrinter)
+                            builder.putPrinters(it.address, presetted(builder, bluetoothName = it.name, printer = discovered))
                         }
                     }
                 iterateUsbPrinters(this@PrintActivity).forEach {
                     val usbId = "%04x:%04x".format(it.vendorId, it.productId)
                     if (!builder.printersMap.contains(usbId)) {
-                        val newPrinter =
+                        val discovered =
                             DEFAULT_PRINTER_SETTINGS
                                 .toBuilder()
                                 .setInterface(Interface.USB)
                                 .setAddress(usbId)
                                 .setName("%s %s".format(it.manufacturerName, it.productName))
-                                .setDriver(Driver.ESC_POS)
-                                .setDithering(Dithering.GRADIENT)
                                 .build()
-                        builder.putPrinters(usbId, newPrinter)
+                        builder.putPrinters(usbId, presetted(builder, usbId = usbId, printer = discovered))
                     }
                 }
                 return@updateData builder.build()

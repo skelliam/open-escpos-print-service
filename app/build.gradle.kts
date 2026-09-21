@@ -71,6 +71,7 @@ dependencies {
     implementation(libs.html2bitmap)
     implementation(libs.material)
     implementation(libs.protobuf.kotlin.lite)
+    testImplementation(libs.json)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

@@ -217,12 +217,173 @@ fun <T> LabelledTextField(
     }
 }
 
+fun presetProvenance(preset: Preset): String = if (preset.testedBy.isEmpty()) "not tested by anyone" else "tested by ${preset.testedBy}"
+
+/**
+ * A preset sets everything except the fields that identify the printer, so it sits above the
+ * individual settings it overwrites.
+ */
+@Composable
+fun PresetSection(
+    context: PrintActivity,
+    uuid: String,
+    settings: PrinterSettings,
+    presets: List<Preset>,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var label by remember { mutableStateOf("") }
+    val detected =
+        if (settings.`interface` == Interface.USB) {
+            matchPreset(presets, null, settings.address)
+        } else {
+            matchPreset(presets, settings.name, null)
+        }
+
+    if (detected != null && applyPreset(detected, settings) != settings) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Looks like ${detected.label}")
+                Text(
+                    text = presetProvenance(detected),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
+            Button(
+                onClick = { context.applyPresetToPrinter(uuid, detected) },
+                colors = ButtonDefaults.elevatedButtonColors(),
+            ) {
+                Text(text = "Apply")
+            }
+        }
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = "Preset")
+        Box {
+            Button(
+                onClick = { expanded = true },
+                enabled = presets.isNotEmpty(),
+                colors = ButtonDefaults.elevatedButtonColors(),
+            ) {
+                Text(text = "Apply a preset")
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                presets.forEach { preset ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(text = preset.label)
+                                Text(
+                                    text = presetProvenance(preset),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                )
+                            }
+                        },
+                        onClick = {
+                            expanded = false
+                            context.applyPresetToPrinter(uuid, preset)
+                        },
+                    )
+                }
+            }
+        }
+    }
+    LabelledTextField(
+        label = "New preset name",
+        value = label,
+        transform = { it },
+        onValueChange = { label = it },
+        keyboardType = KeyboardType.Text,
+    )
+    Button(
+        onClick = {
+            context.saveCurrentAsPreset(uuid, label)
+            label = ""
+        },
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.elevatedButtonColors(),
+    ) {
+        Text(text = "Save these settings as a preset")
+    }
+}
+
+@Composable
+fun PresetLibrary(
+    context: PrintActivity,
+    presets: List<Preset>,
+    userPresetIds: Set<String>,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+        Text(
+            text =
+                "Presets configure everything but the printer's name and address. Export one to " +
+                    "share it, or to contribute it to the project.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        presets.forEach { preset ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = preset.label)
+                    Text(
+                        text = presetProvenance(preset),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                Button(
+                    onClick = { context.copyPresetsToClipboard(listOf(preset)) },
+                    colors = ButtonDefaults.elevatedButtonColors(),
+                ) {
+                    Text(text = "Copy")
+                }
+                if (userPresetIds.contains(preset.id)) {
+                    Button(
+                        onClick = { context.deleteUserPreset(preset.id) },
+                        colors = ButtonDefaults.elevatedButtonColors(),
+                    ) {
+                        Text(text = "Delete")
+                    }
+                }
+            }
+        }
+        Button(
+            onClick = { context.copyPresetsToClipboard(presets) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(text = "Copy all presets")
+        }
+        Button(
+            onClick = { context.importPresetsFromClipboard() },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(text = "Import presets from clipboard")
+        }
+    }
+}
+
 @Composable
 fun PrinterCard(
     context: PrintActivity,
     uuid: String,
     settings: PrinterSettings,
     defaultPrinterAddress: String,
+    presets: List<Preset>,
 ) {
     ExpandableCard(
         header = {
@@ -310,6 +471,12 @@ fun PrinterCard(
                 ) {
                     Text(text = "Delete this printer")
                 }
+                PresetSection(
+                    context = context,
+                    uuid = uuid,
+                    settings = settings,
+                    presets = presets,
+                )
                 MenuSelect(
                     label = "Driver",
                     options =
@@ -523,6 +690,7 @@ fun SettingsScreen(context: PrintActivity) {
     val settings: Settings by context.settingsDataStore.data.collectAsState(Settings.getDefaultInstance())
     val bluetoothAllowed by context.bluetoothAllowed.collectAsState()
     val bluetoothEnabled by context.bluetoothEnabled.collectAsState()
+    val presets = mergePresets(context.builtInPresets, settings.userPresetsMap.values)
 
     OpenESCPOSPrintServiceTheme {
         Surface(
@@ -590,6 +758,7 @@ fun SettingsScreen(context: PrintActivity) {
                                 uuid = uuid,
                                 settings = printerSettings,
                                 defaultPrinterAddress = settings.defaultPrinter,
+                                presets = presets,
                             )
                         }
                 }
@@ -619,6 +788,7 @@ fun SettingsScreen(context: PrintActivity) {
                                 uuid = id,
                                 settings = printerSettings,
                                 defaultPrinterAddress = settings.defaultPrinter,
+                                presets = presets,
                             )
                         }
                 }
@@ -638,6 +808,7 @@ fun SettingsScreen(context: PrintActivity) {
                             uuid = uuid,
                             settings = printerSettings,
                             defaultPrinterAddress = settings.defaultPrinter,
+                            presets = presets,
                         )
                     }
                 Button(
@@ -648,6 +819,19 @@ fun SettingsScreen(context: PrintActivity) {
                 ) {
                     Text(text = "Add a network printer")
                 }
+                Text(
+                    "Presets",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                )
+                PresetLibrary(
+                    context = context,
+                    presets = presets,
+                    userPresetIds = settings.userPresetsMap.keys,
+                )
             }
         }
     }

@@ -72,6 +72,18 @@ You might want to add some inline css in your html to reset the margins:
 
 You can share images to this app, they will be printed on the default printer.
 
+## Presets
+A preset configures a printer in one go: driver, paper size, margins, dithering
+and the TSPL media settings. Pick one from `Apply a preset` in a printer's
+settings, or save your own once the printer prints correctly. A recognised
+printer gets its preset applied the first time it is discovered, and is only
+ever offered one afterwards.
+
+Presets can be copied to the clipboard and pasted back in, which is also how
+you contribute one: see [docs/PRESETS.md](docs/PRESETS.md). Nobody can verify a
+preset for a printer they do not own, so each one records who says they printed
+with it.
+
 ## Details
 If you have an ESC/POS __label__ printer, enable the `Cut after each page` switch, this will make the printer go to the start of the next label (at least on the Netum ones).
 There are speed limits and delays that you can set in each printer settings; if your printer works well, leave these at 0.

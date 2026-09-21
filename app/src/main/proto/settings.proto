@@ -51,10 +51,26 @@ message PrinterSettings {
   int32 density = 21;        // tspl only, 1-15; 0 leaves the printer default
 }
 
+// A named bundle of printer configuration, minus the fields that identify a
+// physical device (enabled, address, name, interface). Those are reused from
+// the printer a preset is applied to; every other field is overwritten.
+message Preset {
+  string id = 1;
+  string label = 2;
+  PrinterSettings settings = 3; // identity fields are ignored
+  repeated string bluetooth_name_prefix = 4;
+  repeated string usb_id = 5; // vendorId:productId, as in Settings.printers
+  string tested_by = 6; // who printed with it; empty means nobody claims to have
+  string notes = 7;
+}
+
 message Settings {
   string default_printer = 1;
   // bluetooth printers: mac address -> settings
   // ip printers: uuid -> settings
   // usb printers: vendorId:productId -> settings
   map<string, PrinterSettings> printers = 2;
+  // presets the user saved or imported, by preset id; these shadow the
+  // presets shipped in assets/presets.json when the ids collide
+  map<string, Preset> user_presets = 3;
 }

@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "presets": [
+    {
+      "id": "citizen-cmp",
+      "label": "Citizen CMP series",
+      "testedBy": "farminos",
+      "notes": "Reproduces the defaults the app used to hardcode for Bluetooth names starting with CMP_.",
+      "match": {
+        "bluetoothNamePrefix": ["CMP_"]
+      },
+      "settings": {
+        "driver": "CPCL",
+        "dithering": "NONE",
+        "dpi": 203,
+        "width": 5.0,
+        "height": 8.0,
+        "marginLeft": 0.0,
+        "marginTop": 0.0,
+        "marginRight": 0.0,
+        "marginBottom": 0.0,
+        "mediaType": "GAP",
+        "gap": 0.0,
+        "density": 0,
+        "cut": true,
+        "cutDelay": 0.0,
+        "keepAlive": true,
+        "speedLimit": 2.0,
+        "skipWhiteLinesAtPageEnd": false
+      }
+    },
+    {
+      "id": "jadens-jd-268bt",
+      "label": "Jadens JD-268BT (4x6 label)",
+      "testedBy": "skelliam",
+      "notes": "203 dpi confirmed by measurement. Gap 0.3 cm suits the 4x6 die-cut stock it ships with.",
+      "settings": {
+        "driver": "TSPL",
+        "dithering": "NONE",
+        "dpi": 203,
+        "width": 10.16,
+        "height": 15.24,
+        "marginLeft": 0.0,
+        "marginTop": 0.0,
+        "marginRight": 0.0,
+        "marginBottom": 0.0,
+        "mediaType": "GAP",
+        "gap": 0.3,
+        "density": 8,
+        "cut": false,
+        "cutDelay": 0.0,
+        "keepAlive": false,
+        "speedLimit": 2.0,
+        "skipWhiteLinesAtPageEnd": false
+      }
+    },
+    {
+      "id": "escpos-58mm",
+      "label": "Generic ESC/POS 58 mm receipt",
+      "testedBy": "",
+      "notes": "Paper-size convention, not a device profile: 58 mm stock with a 48 mm print area. No match rules, so it is never applied on its own.",
+      "settings": {
+        "driver": "ESC_POS",
+        "dithering": "GRADIENT",
+        "dpi": 203,
+        "width": 4.8,
+        "height": 8.0,
+        "marginLeft": 0.0,
+        "marginTop": 0.0,
+        "marginRight": 0.0,
+        "marginBottom": 0.0,
+        "mediaType": "GAP",
+        "gap": 0.0,
+        "density": 0,
+        "cut": true,
+        "cutDelay": 0.0,
+        "keepAlive": false,
+        "speedLimit": 2.0,
+        "skipWhiteLinesAtPageEnd": false
+      }
+    },
+    {
+      "id": "escpos-80mm",
+      "label": "Generic ESC/POS 80 mm receipt",
+      "testedBy": "",
+      "notes": "Paper-size convention, not a device profile: 80 mm stock with a 72 mm print area. No match rules, so it is never applied on its own.",
+      "settings": {
+        "driver": "ESC_POS",
+        "dithering": "GRADIENT",
+        "dpi": 203,
+        "width": 7.2,
+        "height": 8.0,
+        "marginLeft": 0.0,
+        "marginTop": 0.0,
+        "marginRight": 0.0,
+        "marginBottom": 0.0,
+        "mediaType": "GAP",
+        "gap": 0.0,
+        "density": 0,
+        "cut": true,
+        "cutDelay": 0.0,
+        "keepAlive": false,
+        "speedLimit": 2.0,
+        "skipWhiteLinesAtPageEnd": false
+      }
+    }
+  ]
+}
