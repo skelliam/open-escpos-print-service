@@ -34,6 +34,9 @@
       "label": "Jadens JD-268BT (4x6 label)",
       "testedBy": "skelliam",
       "notes": "203 dpi confirmed by measurement. Gap 0.3 cm suits the 4x6 die-cut stock it ships with.",
+      "match": {
+        "bluetoothNamePrefix": ["JD-268BT"]
+      },
       "settings": {
         "driver": "TSPL",
         "dithering": "NONE",
